@@ -221,7 +221,8 @@ const CameraFeed = ({cam}) => {
       src={cam.url}
       title={cam.name}
       style={{width:"100%",height:"100%",border:"none",display:"block"}}
-      sandbox="allow-scripts allow-same-origin allow-forms"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
+      allow="autoplay; fullscreen; encrypted-media"
       allowFullScreen
       onError={()=>setErrored(true)}
     />
