@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useContext, useRef } from "react";
+import { createPortal } from "react-dom";
 import { AppContext } from "../../context/AppContext.js";
 import { relTime } from "../../utils/dates.js";
 import { C } from "../../theme/colors.js";
@@ -9,9 +10,18 @@ import { Badge } from "../../components/ui/index.jsx";
 const NotificationBell = ({onGoToPage})=>{
   const {notifications,setNotifsL,currentUser}=useContext(AppContext);
   const [open,setOpen]=useState(false);
-  const ref=useRef(null);
+  const btnRef=useRef(null);
+  const panelRef=useRef(null);
 
-  useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false)};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h)},[]);
+  useEffect(()=>{
+    const h=e=>{
+      const inBtn=btnRef.current&&btnRef.current.contains(e.target);
+      const inPanel=panelRef.current&&panelRef.current.contains(e.target);
+      if(!inBtn&&!inPanel) setOpen(false);
+    };
+    document.addEventListener("mousedown",h);
+    return()=>document.removeEventListener("mousedown",h);
+  },[]);
 
   const visible=useMemo(()=>{
     return notifications.filter(n=>n.targetAll||n.targetUsers?.includes(currentUser.id)).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
@@ -47,13 +57,13 @@ const NotificationBell = ({onGoToPage})=>{
   const nIcon=t=>t==="ошибка"?<I.alert size={14}/>:t==="предупреждение"?<I.alert size={14}/>:<I.bell size={14}/>;
 
   return(
-    <div ref={ref} style={{position:"relative"}}>
+    <div ref={btnRef} style={{position:"relative"}}>
       <button onClick={()=>setOpen(!open)} style={{position:"relative",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.10)",borderRadius:10,cursor:"pointer",padding:7,color:C.muted,display:"flex",alignItems:"center"}}>
         <I.bell size={18}/>
         {unread>0&&<div style={{position:"absolute",top:0,right:0,width:15,height:15,borderRadius:"50%",background:C.danger,color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(31,29,24,.8)"}}>{unread>9?"9+":unread}</div>}
       </button>
-      {open&&(
-        <div style={{position:"absolute",right:0,top:"100%",marginTop:8,width:380,maxHeight:480,background:"rgba(18,16,13,.88)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,.12)",borderRadius:16,boxShadow:"0 24px 60px rgba(0,0,0,.55)",zIndex:1001,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      {open&&createPortal(
+        <div ref={panelRef} style={{position:"fixed",right:16,top:92,width:380,maxHeight:480,background:"#1A1510",border:"1px solid rgba(255,255,255,.16)",borderRadius:16,boxShadow:"0 24px 80px rgba(0,0,0,.85)",zIndex:9999,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <div style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:14,fontWeight:700,color:C.text}}>Уведомления {unread>0&&<Badge color="danger" s={{marginLeft:6}}>{unread}</Badge>}</span>
             <div style={{display:"flex",gap:6}}>
@@ -82,7 +92,8 @@ const NotificationBell = ({onGoToPage})=>{
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
