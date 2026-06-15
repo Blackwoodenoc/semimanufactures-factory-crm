@@ -285,21 +285,179 @@ export default function App(){
   }),[users,products,tasks,rawMaterials,recipes,taskEmployees,employeeHistory,productionPlans,clients,clientOrders,sales,inventoryMovements,suppliers,deliveries,rawMovements,notifications,marks,logs,addLog,addNotification,currentUser,production,page,hiddenWarnings,productionOutputs,bonusRules,baseSalaries,debts,batches,defects,payrollRecords,cameras,applyOutput,revertOutput,applyServerState]);
 
   const globalStyles = `
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Noto Sans',-apple-system,sans-serif;background:${C.bg};color:${C.text}}
-    input,select,textarea,button{font-family:'Noto Sans',-apple-system,sans-serif}
-    ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${C.border};border-radius:3px}
+    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:${C.bg};color:${C.text};overflow:hidden}
+    input,select,textarea,button{font-family:inherit}
+    ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
     @keyframes slideIn{from{transform:translateX(80px);opacity:0}to{transform:translateX(0);opacity:1}}
     @keyframes fadeUp{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
-    @keyframes pulseBorder{0%,100%{box-shadow:0 0 0 1px rgba(232,80,80,0.3)}50%{box-shadow:0 0 0 3px rgba(232,80,80,0.6)}}
-    @keyframes pulseGlow{0%,100%{opacity:1}50%{opacity:0.3}}
-    option{background:${C.surface};color:${C.text}}
-    @media(max-width:640px){
-      main{padding:10px !important}
-      table{font-size:11px}
-      .hide-mobile{display:none !important}
+    @keyframes softFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulseBorder{0%,100%{box-shadow:0 0 0 1px rgba(255,107,95,.22),0 4px 16px rgba(255,107,95,.06)}50%{box-shadow:0 0 0 2px rgba(255,107,95,.38),0 8px 24px rgba(255,107,95,.12)}}
+    @keyframes pulseGlow{0%,100%{opacity:1}50%{opacity:0.35}}
+    option{background:#1a1612;color:${C.text}}
+    .app-bg{
+      min-height:100vh;height:100vh;
+      padding:24px;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(211,166,70,.18), transparent 32%),
+        radial-gradient(circle at 82% 18%, rgba(72,224,213,.11), transparent 30%),
+        radial-gradient(circle at 55% 95%, rgba(167,139,250,.10), transparent 36%),
+        linear-gradient(135deg, #0f0d0a 0%, #17130f 48%, #211a13 100%);
+      color:${C.text};
+      overflow:hidden;
+      position:relative;
     }
+    .app-bg::before{
+      content:"";
+      position:fixed;inset:0;pointer-events:none;opacity:.035;
+      background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.35) 1px, transparent 0);
+      background-size:22px 22px;
+      mix-blend-mode:overlay;
+    }
+    .app-shell{
+      position:relative;z-index:1;
+      max-width:1540px;height:calc(100vh - 48px);
+      margin:0 auto;
+      display:grid;grid-template-columns:252px minmax(0,1fr);
+      overflow:hidden;
+      border-radius:30px;
+      background:rgba(31,29,24,.58);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:0 32px 110px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.10);
+      backdrop-filter:blur(30px) saturate(130%);
+      -webkit-backdrop-filter:blur(30px) saturate(130%);
+    }
+    .glass-sidebar{
+      min-height:0;display:flex;flex-direction:column;
+      background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+      border-right:1px solid rgba(255,255,255,.09);
+    }
+    .app-workspace{min-width:0;min-height:0;display:flex;flex-direction:column}
+    .glass-topbar{
+      min-height:58px;display:flex;align-items:center;gap:10px;
+      padding:10px 18px;
+      background:rgba(255,255,255,.035);
+      border-bottom:1px solid rgba(255,255,255,.08);
+      backdrop-filter:blur(20px);
+      -webkit-backdrop-filter:blur(20px);
+      flex-shrink:0;
+    }
+    .page-canvas{flex:1;min-height:0;overflow:auto;padding:22px}
+    .glass-chip{
+      display:flex;align-items:center;gap:8px;
+      padding:6px 12px;
+      background:rgba(255,255,255,.055);
+      border:1px solid rgba(255,255,255,.09);
+      border-radius:999px;
+      cursor:pointer;
+      transition:background .18s ease,border-color .18s ease,transform .18s ease;
+    }
+    .glass-chip:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+    .nav-item{
+      display:flex;align-items:center;gap:9;width:100%;
+      padding:9px 12px;border:none;border-radius:12;
+      background:transparent;color:${C.muted};
+      font-size:13;font-weight:500;cursor:pointer;
+      font-family:inherit;text-align:left;margin-bottom:2;
+      border-left:3px solid transparent;
+      transition:background .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease;
+    }
+    .nav-item:hover{background:rgba(255,255,255,.06);color:${C.text}}
+    .nav-item.active{
+      background:rgba(211,166,70,.13);color:${C.primary};
+      border:1px solid rgba(211,166,70,.20);
+      border-left:3px solid ${C.primary};
+      box-shadow:0 4px 20px rgba(211,166,70,.08);
+    }
+    .nav-sub-item{
+      display:flex;align-items:center;gap:9;width:100%;
+      padding:7px 11px 7px 38px;border:none;border-radius:10;
+      background:transparent;color:${C.dim};
+      font-size:12;font-weight:400;cursor:pointer;
+      font-family:inherit;margin-bottom:1;text-align:left;
+      border-left:3px solid transparent;
+      transition:background .18s ease,color .18s ease;
+    }
+    .nav-sub-item:hover{background:rgba(255,255,255,.05);color:${C.muted}}
+    .nav-sub-item.active{
+      background:rgba(211,166,70,.10);color:${C.primary};
+      border:1px solid rgba(211,166,70,.15);
+      font-weight:600;
+    }
+    .nav-group-btn{
+      display:flex;align-items:center;gap:9;width:100%;
+      padding:9px 12px;border:none;border-radius:12;
+      background:transparent;color:${C.muted};
+      font-size:13;font-weight:500;cursor:pointer;
+      font-family:inherit;text-align:left;
+      transition:background .18s ease,color .18s ease;
+    }
+    .nav-group-btn:hover{background:rgba(255,255,255,.06);color:${C.text}}
+    .nav-group-btn.active-group{color:${C.primary};font-weight:700}
+    .clickable-glass{transition:background .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
+    .clickable-glass:hover{
+      transform:translateY(-2px);
+      border-color:rgba(255,255,255,.16);
+      background:linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.045));
+    }
+    .data-table tbody tr{transition:background .15s ease}
+    .data-table tbody tr:hover{background:rgba(255,255,255,.045)}
+    .dashboard-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;align-items:start}
+    .dashboard-main{min-width:0;display:grid;gap:16px}
+    .dashboard-rail{display:grid;gap:16px;position:sticky;top:0}
+    .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    .kpi-row{display:flex;flex-wrap:wrap;gap:12px}
+    .hero-mini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:16px}
+    .period-tabs{display:flex;gap:6px}
+    .period-tab{
+      padding:5px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.04);color:${C.muted};
+      font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;
+      transition:all .18s ease;
+    }
+    .period-tab.active{background:rgba(211,166,70,.14);color:${C.primary};border-color:rgba(211,166,70,.25)}
+    .period-tab:hover:not(.active){background:rgba(255,255,255,.07);color:${C.text}}
+    .hero-number{font-size:32px;font-weight:800;color:${C.text};line-height:1.1}
+    .hero-sub{font-size:12px;color:${C.dim};margin-top:4px}
+    .eyebrow{font-size:11px;font-weight:600;color:${C.primary};text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+    .risk-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+    .quick-action-btn{
+      display:flex;align-items:center;gap:6;padding:8px 14px;
+      border-radius:10px;border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.05);color:${C.text};
+      font-size:12;font-weight:600;cursor:pointer;font-family:inherit;
+      transition:all .18s ease;
+    }
+    .quick-action-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.16);transform:translateY(-1px)}
+    .user-glass-card{
+      padding:10px 12px;border-radius:14px;
+      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+    }
+    .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;backdrop-filter:blur(2px)}
+  @media(max-width:1100px){
+    .dashboard-grid{grid-template-columns:1fr}
+    .dashboard-rail{position:static}
+    .chart-grid{grid-template-columns:1fr}
+  }
+  @media(max-width:900px){
+    .app-bg{padding:0}
+    .app-shell{height:100vh;border-radius:0;max-width:none;grid-template-columns:1fr}
+    .glass-sidebar{
+      position:fixed;top:0;left:0;bottom:0;width:252px;z-index:999;
+      transform:translateX(-100%);transition:transform .3s ease;
+      box-shadow:0 20px 60px rgba(0,0,0,.5);
+    }
+    .glass-sidebar.open{transform:translateX(0)}
+    .page-canvas{padding:14px}
+  }
+  @media(max-width:520px){
+    .page-canvas{padding:12px}
+    .hero-number{font-size:26px}
+  }
+  @media(max-width:640px){
+    table{font-size:12px}
+    .hide-mobile{display:none !important}
+  }
   `;
 
   // Board mode: no login required — kitchen display screen
@@ -422,107 +580,117 @@ export default function App(){
   return(
     <AppContext.Provider value={ctx}>
       <style>{globalStyles}</style>
+      <div className="app-bg">
+        {!serverOnline&&<div style={{position:"fixed",top:0,left:0,right:0,zIndex:1001,background:C.danger,color:"#fff",padding:"5px 16px",fontSize:12,fontWeight:600,textAlign:"center",letterSpacing:.3}}>Нет соединения с сервером — изменения не сохраняются</div>}
+        {saveError&&serverOnline&&<div style={{position:"fixed",top:serverOnline?0:26,left:0,right:0,zIndex:1001,background:C.danger,color:"#fff",padding:"5px 16px",fontSize:12,fontWeight:600,textAlign:"center",letterSpacing:.3}}>Изменение не сохранено{saveError.status?` (${saveError.status})`:""} — нет прав или ошибка сервера. Страница будет пересинхронизирована.</div>}
 
-      {sideOpen&&<div onClick={()=>setSideOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:998}}/>}
-      {!serverOnline&&<div style={{position:"fixed",top:0,left:0,right:0,zIndex:1001,background:C.danger,color:"#fff",padding:"5px 16px",fontSize:12,fontWeight:600,textAlign:"center",letterSpacing:.3}}>Нет соединения с сервером — изменения не сохраняются</div>}
-      {saveError&&serverOnline&&<div style={{position:"fixed",top:serverOnline?0:26,left:0,right:0,zIndex:1001,background:C.danger,color:"#fff",padding:"5px 16px",fontSize:12,fontWeight:600,textAlign:"center",letterSpacing:.3}}>Изменение не сохранено{saveError.status?` (${saveError.status})`:""} — нет прав или ошибка сервера. Страница будет пересинхронизирована.</div>}
+        {isMobile&&sideOpen&&<div className="sidebar-overlay" onClick={()=>setSideOpen(false)}/>}
 
-      <aside style={{position:"fixed",top:0,left:0,bottom:0,width:220,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",transition:"transform .3s",zIndex:999,transform:isMobile&&!sideOpen?"translateX(-100%)":"translateX(0)"}}>
-        <div style={{padding:"16px 14px",borderBottom:`1px solid ${C.border}`}}>
-          <div style={{display:"flex",alignItems:"center",gap:9}}>
-            <div style={{width:34,height:34,borderRadius:9,background:`linear-gradient(135deg, ${C.primary}25, ${C.primary}10)`,display:"flex",alignItems:"center",justifyContent:"center",color:C.primary,border:`1px solid ${C.primary}30`}}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                <path d="M2 17l10 5 10-5"/>
-                <path d="M2 12l10 5 10-5"/>
-              </svg>
+        <div className="app-shell">
+          <aside className={`glass-sidebar${isMobile?(sideOpen?" open":""):""}`}>
+            <div style={{padding:"16px 14px",borderBottom:"1px solid rgba(255,255,255,.08)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:38,height:38,borderRadius:12,background:`linear-gradient(135deg, rgba(211,166,70,.25), rgba(211,166,70,.08))`,display:"flex",alignItems:"center",justifyContent:"center",color:C.primary,border:"1px solid rgba(211,166,70,.28)",boxShadow:"0 4px 16px rgba(211,166,70,.12)"}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:800,color:C.text,letterSpacing:.4}}>Dikanish</div>
+                  <div style={{fontSize:10,color:C.dim}}>Factory OS · v7.0</div>
+                </div>
+              </div>
             </div>
-            <div><div style={{fontSize:15,fontWeight:800,color:C.text,letterSpacing:.5}}>Dikanish</div><div style={{fontSize:10,color:C.dim}}>v7.0</div></div>
-          </div>
-        </div>
-        <EthnicBorder color={C.primary} height={2}/>
-        <nav style={{flex:1,padding:"8px 8px",overflowY:"auto"}}>
-          {navGroups.map(group=>{
-            const GIco=group.icon;
-            const isOpen=isGroupOpen(group.id);
-            const groupHasActive=group.items.some(i=>i.id===page);
-            const isSingle=group.items.length===1;
-            const showBadgeOnGroup=group.id==="system"&&unreadCount>0;
+            <EthnicBorder color={C.primary} height={2}/>
+            <nav style={{flex:1,padding:"10px 10px",overflowY:"auto"}}>
+              {navGroups.map(group=>{
+                const GIco=group.icon;
+                const isOpen=isGroupOpen(group.id);
+                const groupHasActive=group.items.some(i=>i.id===page);
+                const isSingle=group.items.length===1;
+                const showBadgeOnGroup=group.id==="system"&&unreadCount>0;
 
-            // Single-item group: render as direct link, no accordion
-            if(isSingle){
-              const item=group.items[0];
-              const active=page===item.id;
-              return(
-                <button key={group.id} onClick={()=>{setPage(item.id);setSideOpen(false)}} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"9px 11px",border:"none",borderRadius:7,background:active?C.primaryBg:"transparent",color:active?C.primary:C.muted,fontSize:13,fontWeight:active?700:500,cursor:"pointer",fontFamily:"inherit",marginBottom:2,textAlign:"left",borderLeft:active?`3px solid ${C.primary}`:"3px solid transparent",transition:"all .15s"}}>
-                  <GIco size={16}/>{group.label}
-                  {showBadgeOnGroup&&<span style={{marginLeft:"auto",minWidth:18,height:18,borderRadius:9,background:C.danger,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 5px"}}>{unreadCount>9?"9+":unreadCount}</span>}
-                </button>
-              );
-            }
+                if(isSingle){
+                  const item=group.items[0];
+                  const active=page===item.id;
+                  return(
+                    <button key={group.id} onClick={()=>{setPage(item.id);setSideOpen(false)}} className={`nav-item${active?" active":""}`}>
+                      <GIco size={16}/>{group.label}
+                      {showBadgeOnGroup&&<span style={{marginLeft:"auto",minWidth:18,height:18,borderRadius:9,background:C.danger,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 5px"}}>{unreadCount>9?"9+":unreadCount}</span>}
+                    </button>
+                  );
+                }
 
-            // Multi-item group: accordion
-            return(
-              <div key={group.id} style={{marginBottom:4}}>
-                <button onClick={()=>toggleGroup(group.id)} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"9px 11px",border:"none",borderRadius:7,background:groupHasActive&&!isOpen?C.primaryBg:"transparent",color:groupHasActive?C.primary:C.muted,fontSize:13,fontWeight:groupHasActive?700:500,cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
-                  <GIco size={16}/>
-                  <span style={{flex:1}}>{group.label}</span>
-                  {showBadgeOnGroup&&<span style={{minWidth:18,height:18,borderRadius:9,background:C.danger,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 5px",marginRight:4}}>{unreadCount>9?"9+":unreadCount}</span>}
-                  <span style={{transition:"transform .2s",transform:isOpen?"rotate(180deg)":"rotate(0deg)",opacity:.5,flexShrink:0,display:"flex",alignItems:"center"}}><I.chevDown size={14}/></span>
-                </button>
-                <div style={{overflow:"hidden",maxHeight:isOpen?`${group.items.length*36+4}px`:"0px",transition:"max-height .25s ease",marginLeft:0}}>
-                  {group.items.map(item=>{
-                    const active=page===item.id;
-                    const showItemBadge=item.id==="notifications"&&unreadCount>0;
-                    return(
-                      <button key={item.id} onClick={()=>{setPage(item.id);setSideOpen(false)}} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"7px 11px 7px 38px",border:"none",borderRadius:6,background:active?C.primaryBg:"transparent",color:active?C.primary:C.dim,fontSize:12,fontWeight:active?600:400,cursor:"pointer",fontFamily:"inherit",marginBottom:1,textAlign:"left",borderLeft:active?`3px solid ${C.primary}`:"3px solid transparent",transition:"all .15s"}}>
-                        {item.label}
-                        {showItemBadge&&<span style={{marginLeft:"auto",minWidth:16,height:16,borderRadius:8,background:C.danger,color:"#fff",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{unreadCount>9?"9+":unreadCount}</span>}
-                      </button>
-                    );
-                  })}
+                return(
+                  <div key={group.id} style={{marginBottom:4}}>
+                    <button onClick={()=>toggleGroup(group.id)} className={`nav-group-btn${groupHasActive?" active-group":""}`}>
+                      <GIco size={16}/>
+                      <span style={{flex:1}}>{group.label}</span>
+                      {showBadgeOnGroup&&<span style={{minWidth:18,height:18,borderRadius:9,background:C.danger,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 5px",marginRight:4}}>{unreadCount>9?"9+":unreadCount}</span>}
+                      <span style={{transition:"transform .2s",transform:isOpen?"rotate(180deg)":"rotate(0deg)",opacity:.5,flexShrink:0,display:"flex",alignItems:"center"}}><I.chevDown size={14}/></span>
+                    </button>
+                    <div style={{overflow:"hidden",maxHeight:isOpen?`${group.items.length*38+4}px`:"0px",transition:"max-height .25s ease"}}>
+                      {group.items.map(item=>{
+                        const active=page===item.id;
+                        const showItemBadge=item.id==="notifications"&&unreadCount>0;
+                        return(
+                          <button key={item.id} onClick={()=>{setPage(item.id);setSideOpen(false)}} className={`nav-sub-item${active?" active":""}`}>
+                            {item.label}
+                            {showItemBadge&&<span style={{marginLeft:"auto",minWidth:16,height:16,borderRadius:8,background:C.danger,color:"#fff",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{unreadCount>9?"9+":unreadCount}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </nav>
+            <div style={{padding:"12px 14px",borderTop:"1px solid rgba(255,255,255,.08)"}}>
+              <div className="user-glass-card" style={{marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:9}}>
+                  <div style={{width:32,height:32,borderRadius:10,background:`linear-gradient(135deg, rgba(211,166,70,.22), rgba(211,166,70,.08))`,display:"flex",alignItems:"center",justifyContent:"center",color:C.primary,fontWeight:800,fontSize:13,border:"1px solid rgba(211,166,70,.22)"}}>{currentUser.name.charAt(0)}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{currentUser.name.split(" ").slice(0,2).join(" ")}</div>
+                    <div style={{fontSize:10,color:C.dim}}>{role?.label}</div>
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </nav>
-        <div style={{padding:"12px 14px",borderTop:`1px solid ${C.border}`}}>
-          <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:8}}>
-            <div style={{width:30,height:30,borderRadius:7,background:`linear-gradient(135deg, ${C.primary}25, ${C.primary}10)`,display:"flex",alignItems:"center",justifyContent:"center",color:C.primary,fontWeight:800,fontSize:13,border:`1px solid ${C.primary}25`}}>{currentUser.name.charAt(0)}</div>
-            <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{currentUser.name.split(" ").slice(0,2).join(" ")}</div><div style={{fontSize:10,color:C.dim}}>{role?.label}</div></div>
-          </div>
-          <Btn v="secondary" sz="sm" onClick={handleLogout} icon={<I.out size={13}/>} style={{width:"100%",justifyContent:"center"}}>Выйти</Btn>
-        </div>
-      </aside>
+              <Btn v="secondary" sz="sm" onClick={handleLogout} icon={<I.out size={13}/>} style={{width:"100%",justifyContent:"center"}}>Выйти</Btn>
+            </div>
+          </aside>
 
-      <div style={{marginLeft:isMobile?0:220,minHeight:"100vh"}}>
-        <header style={{padding:"10px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:10,background:C.surface}}>
-          <button onClick={()=>setSideOpen(!sideOpen)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",padding:3}}><I.menu size={20}/></button>
-          {/* ── Budget indicator ── */}
-          {isManagerLike&&(()=>{
-            const totalIncome=sales.reduce((s,sl)=>{const p=products.find(x=>x.id===sl.productId);return s+(p?.sellPrice||0)*sl.quantity},0)+clientOrders.filter(o=>o.status==="отгружен").reduce((s,o)=>s+o.total,0);
-            const totalExpense=deliveries.reduce((s,d)=>s+d.totalPrice,0);
-            const balance=totalIncome-totalExpense;
-            const monthStr=new Date().toISOString().slice(0,7);
-            const monthIncome=sales.filter(sl=>sl.createdAt?.startsWith(monthStr)).reduce((s,sl)=>{const p=products.find(x=>x.id===sl.productId);return s+(p?.sellPrice||0)*sl.quantity},0)+clientOrders.filter(o=>o.status==="отгружен"&&o.shippedAt?.startsWith(monthStr)).reduce((s,o)=>s+o.total,0);
-            const monthExpense=deliveries.filter(d=>d.date?.startsWith(monthStr)).reduce((s,d)=>s+d.totalPrice,0);
-            const monthProfit=monthIncome-monthExpense;
-            const emoji=monthProfit>0?"🟢":monthProfit===0?"🟡":"🔴";
-            return(
-              <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 12px",background:C.bg,borderRadius:8,border:`1px solid ${C.border}`,cursor:"pointer"}} onClick={()=>setPage("profitAnalytics")} title="Подробная аналитика">
-                <span style={{fontSize:12}}>{emoji}</span>
-                <div style={{lineHeight:1.2}}>
-                  <div style={{fontSize:11,fontWeight:700,color:balance>=0?C.success:C.danger}}>{balance>=0?"+":""}{(balance/1000).toFixed(0)}т ₽</div>
-                  <div style={{fontSize:9,color:C.dim}}>мес: {monthProfit>=0?"+":""}{(monthProfit/1000).toFixed(0)}т</div>
-                </div>
-              </div>
-            );
-          })()}
-          <div style={{flex:1}}/>
-          <NotificationBell onGoToPage={setPage}/>
-          <Badge color={isSuperAdmin?"danger":isManager?"info":"primary"}>{role?.label}</Badge>
-        </header>
-        <main style={{padding:20,maxWidth:1200}}>{renderPage()}</main>
+          <div className="app-workspace">
+            <header className="glass-topbar">
+              <button onClick={()=>setSideOpen(!sideOpen)} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.10)",borderRadius:10,color:C.muted,cursor:"pointer",padding:7,display:isMobile?"flex":"none",alignItems:"center"}}><I.menu size={18}/></button>
+              {isManagerLike&&(()=>{
+                const totalIncome=sales.reduce((s,sl)=>{const p=products.find(x=>x.id===sl.productId);return s+(p?.sellPrice||0)*sl.quantity},0)+clientOrders.filter(o=>o.status==="отгружен").reduce((s,o)=>s+o.total,0);
+                const totalExpense=deliveries.reduce((s,d)=>s+d.totalPrice,0);
+                const balance=totalIncome-totalExpense;
+                const monthStr=new Date().toISOString().slice(0,7);
+                const monthIncome=sales.filter(sl=>sl.createdAt?.startsWith(monthStr)).reduce((s,sl)=>{const p=products.find(x=>x.id===sl.productId);return s+(p?.sellPrice||0)*sl.quantity},0)+clientOrders.filter(o=>o.status==="отгружен"&&o.shippedAt?.startsWith(monthStr)).reduce((s,o)=>s+o.total,0);
+                const monthExpense=deliveries.filter(d=>d.date?.startsWith(monthStr)).reduce((s,d)=>s+d.totalPrice,0);
+                const monthProfit=monthIncome-monthExpense;
+                const balClr=balance>=0?C.success:C.danger;
+                return(
+                  <div className="glass-chip" onClick={()=>setPage("profitAnalytics")} title="Подробная аналитика">
+                    <span style={{fontSize:11,color:monthProfit>0?C.success:monthProfit===0?C.orange:C.danger}}>●</span>
+                    <div style={{lineHeight:1.2}}>
+                      <div style={{fontSize:12,fontWeight:700,color:balClr}}>{balance>=0?"+":""}{(balance/1000).toFixed(0)}т ₽</div>
+                      <div style={{fontSize:9,color:C.dim}}>мес: {monthProfit>=0?"+":""}{(monthProfit/1000).toFixed(0)}т</div>
+                    </div>
+                  </div>
+                );
+              })()}
+              <div style={{flex:1}}/>
+              {!isWorker&&<div className="hide-mobile"><Btn v="secondary" sz="sm" onClick={()=>setPage("tasks")} icon={<I.plus size={14}/>}>Задание</Btn></div>}
+              <NotificationBell onGoToPage={setPage}/>
+              <Badge color={isSuperAdmin?"danger":isManager?"info":"primary"}>{role?.label}</Badge>
+            </header>
+            <main className="page-canvas">{renderPage()}</main>
+          </div>
+        </div>
       </div>
     </AppContext.Provider>
   );

@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, useMemo, useContext, useRef } from "react";
+import { useState, useEffect, useMemo, useContext, useRef } from "react";
 import { AppContext } from "../../context/AppContext.js";
-import { ROLES } from "../../constants/index.js";
+import { relTime } from "../../utils/dates.js";
 import { C } from "../../theme/colors.js";
 import { I } from "../../icons/Icons.jsx";
-import { Badge, Btn, Modal, Card } from "../../components/ui/index.jsx";
+import { Badge } from "../../components/ui/index.jsx";
 
 // NOTIFICATION BELL (Header Dropdown)
 const NotificationBell = ({onGoToPage})=>{
-  const {notifications,setNotifsL,currentUser,users}=useContext(AppContext);
+  const {notifications,setNotifsL,currentUser}=useContext(AppContext);
   const [open,setOpen]=useState(false);
   const ref=useRef(null);
 
@@ -32,7 +32,7 @@ const NotificationBell = ({onGoToPage})=>{
       if(!r.ok) return;
       const data=await r.json();
       if(data?.dk_notifications) setNotifsL(data.dk_notifications);
-    }catch{}
+    }catch{/* network */}
   };
   const markAllRead=async()=>{
     try{
@@ -40,7 +40,7 @@ const NotificationBell = ({onGoToPage})=>{
       if(!r.ok) return;
       const data=await r.json();
       if(data?.dk_notifications) setNotifsL(data.dk_notifications);
-    }catch{}
+    }catch{/* network */}
   };
 
   const nColor=t=>t==="ошибка"?C.danger:t==="предупреждение"?C.primary:C.info;
@@ -48,13 +48,13 @@ const NotificationBell = ({onGoToPage})=>{
 
   return(
     <div ref={ref} style={{position:"relative"}}>
-      <button onClick={()=>setOpen(!open)} style={{position:"relative",background:"none",border:"none",cursor:"pointer",padding:6,color:C.muted}}>
-        <I.bell size={20}/>
-        {unread>0&&<div style={{position:"absolute",top:2,right:2,width:16,height:16,borderRadius:"50%",background:C.danger,color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{unread>9?"9+":unread}</div>}
+      <button onClick={()=>setOpen(!open)} style={{position:"relative",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.10)",borderRadius:10,cursor:"pointer",padding:7,color:C.muted,display:"flex",alignItems:"center"}}>
+        <I.bell size={18}/>
+        {unread>0&&<div style={{position:"absolute",top:0,right:0,width:15,height:15,borderRadius:"50%",background:C.danger,color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(31,29,24,.8)"}}>{unread>9?"9+":unread}</div>}
       </button>
       {open&&(
-        <div style={{position:"absolute",right:0,top:"100%",marginTop:6,width:380,maxHeight:480,background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:"0 15px 50px rgba(0,0,0,.5)",zIndex:1001,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{position:"absolute",right:0,top:"100%",marginTop:8,width:380,maxHeight:480,background:"rgba(18,16,13,.88)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,.12)",borderRadius:16,boxShadow:"0 24px 60px rgba(0,0,0,.55)",zIndex:1001,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:14,fontWeight:700,color:C.text}}>Уведомления {unread>0&&<Badge color="danger" s={{marginLeft:6}}>{unread}</Badge>}</span>
             <div style={{display:"flex",gap:6}}>
               {unread>0&&<button onClick={markAllRead} style={{background:"none",border:"none",color:C.info,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Прочитать все</button>}
@@ -66,7 +66,7 @@ const NotificationBell = ({onGoToPage})=>{
             visible.slice(0,10).map(n=>{
               const isRead=n.readBy?.includes(currentUser.id);
               return(
-                <div key={n.id} onClick={()=>{if(!isRead)markRead(n.id)}} style={{padding:"10px 16px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:isRead?"transparent":`${C.primary}06`,transition:"background .15s"}}>
+                <div key={n.id} onClick={()=>{if(!isRead)markRead(n.id)}} style={{padding:"10px 16px",borderBottom:"1px solid rgba(255,255,255,.06)",cursor:"pointer",background:isRead?"transparent":`${C.primaryBg}`,transition:"background .15s"}}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
                     <div style={{width:28,height:28,borderRadius:7,background:`${nColor(n.type)}15`,color:nColor(n.type),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>{nIcon(n.type)}</div>
                     <div style={{flex:1,minWidth:0}}>
