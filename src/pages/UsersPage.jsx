@@ -6,10 +6,11 @@ import { fmtDate, fmtShort, fmtTime, daysBetween, relTime } from "../utils/dates
 import { C, CC } from "../theme/colors.js";
 import { I } from "../icons/Icons.jsx";
 import { EthnicBorder, EthnicCorner, Badge, Btn, Inp, Sel, Txa, Modal, Confirm, Stat, Toast, TH, TD, Card, Title, PageH, SearchBox } from "../components/ui/index.jsx";
+import { apiFetch } from "../api/client.js";
 
 // USERS
 const UsersPage = ()=>{
-  const {users,setUsers,addLog,currentUser,baseSalaries,setBaseSalaries}=useContext(AppContext);
+  const {users,addLog,currentUser,baseSalaries,setBaseSalaries,applyServerState}=useContext(AppContext);
   const [modal,setModal]=useState(false);
   const [edit,setEdit]=useState(null);
   const [search,setSearch]=useState("");
@@ -28,13 +29,18 @@ const UsersPage = ()=>{
     const extra={jobTitle:form.jobTitle,payType:form.payType,dailyNorm:form.dailyNorm?+form.dailyNorm:0,pieceRate:form.pieceRate?+form.pieceRate:0,fixedDayRate:form.fixedDayRate?+form.fixedDayRate:0,comment:form.comment};
     if(edit){
       try{
-        // Update via server endpoint (validates + preserves password hash)
-        const r=await fetch(`/api/admin/users/${edit.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:form.name,email:form.email,roleId:+form.roleId,status:form.status,...extra})});
-        if(!r.ok){const d=await r.json();setToast({message:d.error||"Ошибка",type:"error"});return;}
-        const {user}=await r.json();
-        setUsers(p=>p.map(u=>u.id===edit.id?{...u,...user}:u));
+        // Update via server endpoint (validates + preserves password hash).
+        // Response state is applied locally only (applyServerState) — never re-posted
+        // to /api/state/dk_users, which would overwrite the server's password hashes
+        // with whatever sanitized (passwordless) copy the client currently holds.
+        const r=await apiFetch(`/api/admin/users/${edit.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:form.name,email:form.email,roleId:+form.roleId,status:form.status,...extra})});
+        if(!r){setToast({message:"Нет соединения с сервером",type:"error"});return;}
+        const d=await r.json();
+        if(!r.ok){setToast({message:d.error||"Ошибка",type:"error"});return;}
+        applyServerState(d.state);
         if(form.password){
-          await fetch(`/api/admin/users/${edit.id}/password`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({newPassword:form.password})});
+          const pr=await apiFetch(`/api/admin/users/${edit.id}/password`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({newPassword:form.password})});
+          if(pr&&pr.ok){const pd=await pr.json();if(pd.state)applyServerState(pd.state);}
         }
         if(sal>0) setBaseSalaries(p=>({...p,[edit.id]:sal}));
         else setBaseSalaries(p=>{const n={...p};delete n[edit.id];return n;});
@@ -42,12 +48,13 @@ const UsersPage = ()=>{
       }catch{setToast({message:"Ошибка сети",type:"error"});return;}
     }else{
       try{
-        // Create via server — password hashed server-side atomically, no race condition
-        const r=await fetch("/api/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:form.name,email:form.email,password:form.password,roleId:+form.roleId,status:form.status,...extra})});
-        if(!r.ok){const d=await r.json();setToast({message:d.error||"Ошибка",type:"error"});return;}
-        const {user}=await r.json();
-        setUsers(p=>[...p,user]);
-        if(sal>0) setBaseSalaries(p=>({...p,[user.id]:sal}));
+        // Create via server — password hashed server-side atomically, no race condition.
+        const r=await apiFetch("/api/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:form.name,email:form.email,password:form.password,roleId:+form.roleId,status:form.status,...extra})});
+        if(!r){setToast({message:"Нет соединения с сервером",type:"error"});return;}
+        const d=await r.json();
+        if(!r.ok){setToast({message:d.error||"Ошибка",type:"error"});return;}
+        applyServerState(d.state);
+        if(sal>0) setBaseSalaries(p=>({...p,[d.user.id]:sal}));
         addLog(`Создан: ${form.name}`);setToast({message:"Создан",type:"success"});
       }catch{setToast({message:"Ошибка сети",type:"error"});return;}
     }
@@ -55,11 +62,12 @@ const UsersPage = ()=>{
   };
   const toggleBlock=async(u)=>{
     try{
-      const r=await fetch(`/api/admin/users/${u.id}/block`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({blocked:u.status==="active"})});
-      if(!r.ok){const d=await r.json();setToast({message:d.error||"Ошибка",type:"error"});return;}
-      const {user:updated}=await r.json();
-      setUsers(p=>p.map(x=>x.id===u.id?{...x,...updated}:x));
-      const blocked=updated.status==="blocked";
+      const r=await apiFetch(`/api/admin/users/${u.id}/block`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({blocked:u.status==="active"})});
+      if(!r){setToast({message:"Нет соединения с сервером",type:"error"});return;}
+      const d=await r.json();
+      if(!r.ok){setToast({message:d.error||"Ошибка",type:"error"});return;}
+      applyServerState(d.state);
+      const blocked=d.user.status==="blocked";
       addLog(`${blocked?"Заблок.":"Разблок."}: ${u.name}`);
       setToast({message:blocked?"Заблокирован":"Разблокирован",type:blocked?"error":"success"});
     }catch{setToast({message:"Ошибка сети",type:"error"});}
@@ -75,6 +83,7 @@ const UsersPage = ()=>{
               <TD s={{fontWeight:500}}>
                 <div>{u.name}</div>
                 <div style={{fontSize:10,color:C.dim}}>{u.email}</div>
+                {u.hasPassword===false&&<div style={{fontSize:10,color:C.danger}}>Пароль не задан — задайте новый пароль</div>}
               </TD>
               <TD s={{color:C.muted,fontSize:12}}>{u.jobTitle||"—"}</TD>
               <TD><Badge color={u.roleId===1?"danger":u.roleId===2?"info":"primary"}>{role?.label}</Badge></TD>
