@@ -1,4 +1,4 @@
-.PHONY: env install dev build db db-stop db-shell docker-up docker-down docker-build logs clean setup backup backup-local help
+.PHONY: env install dev build db db-stop db-shell docker-up docker-down docker-build logs clean setup backup backup-local cron-setup cron-remove cron-status help
 
 # ── Первичная настройка ────────────────────────────────────────────
 ## Скопировать .env.example → .env (не перезаписывает если уже есть)
@@ -19,8 +19,9 @@ setup: env install db
 	@echo "Готово! Запусти: make dev"
 
 # ── Разработка ─────────────────────────────────────────────────────
-## Запустить dev-сервер (Vite + API вместе)
+## Запустить dev-сервер (Vite + API вместе) — БД поднимается автоматически
 dev:
+	docker compose up db -d
 	npm run dev
 
 ## Собрать production-билд
@@ -68,6 +69,27 @@ backup-local:
 backup:
 	@bash scripts/backup.sh
 
+# ── Cron на VPS ────────────────────────────────────────────────────
+VPS_HOST ?= root@193.187.94.98
+CRON_JOB  = 0 3 * * * /var/www/dikanish/scripts/backup.sh >> /var/www/dikanish/backups/backup.log 2>&1
+
+## Добавить cron-задачу бэкапа на VPS (ежедневно в 03:00)
+cron-setup:
+	@ssh $(VPS_HOST) '\
+		crontab -l 2>/dev/null | grep -qF "dikanish/scripts/backup.sh" \
+		&& echo "Cron уже настроен" \
+		|| { (crontab -l 2>/dev/null; echo "$(CRON_JOB)") | crontab - && echo "Cron добавлен: $(CRON_JOB)"; }'
+
+## Удалить cron-задачу бэкапа с VPS
+cron-remove:
+	@ssh $(VPS_HOST) '\
+		crontab -l 2>/dev/null | grep -vF "dikanish/scripts/backup.sh" | crontab - \
+		&& echo "Cron удалён"'
+
+## Показать текущий crontab на VPS
+cron-status:
+	@ssh $(VPS_HOST) 'crontab -l 2>/dev/null || echo "Crontab пуст"'
+
 # ── Прочее ─────────────────────────────────────────────────────────
 ## Удалить dist/ и node_modules/
 clean:
@@ -89,5 +111,8 @@ help:
 	@echo "  make logs         — логи app-контейнера"
 	@echo "  make backup-local — бэкап БД через Docker (локально)"
 	@echo "  make backup       — бэкап БД через pg_dump (.env / VPS)"
+	@echo "  make cron-setup   — добавить авто-бэкап на VPS (03:00 каждую ночь)"
+	@echo "  make cron-remove  — удалить cron-задачу с VPS"
+	@echo "  make cron-status  — показать crontab на VPS"
 	@echo "  make clean        — удалить dist/ и node_modules/"
 	@echo ""

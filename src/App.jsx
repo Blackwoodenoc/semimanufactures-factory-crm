@@ -49,6 +49,7 @@ import { DefectsPage } from "./pages/DefectsPage.jsx";
 import { AIChatPage } from "./pages/AIChatPage.jsx";
 import { PackingPage } from "./pages/PackingPage.jsx";
 import { DeliveryPage } from "./pages/DeliveryPage.jsx";
+import { MessagesPage } from "./pages/MessagesPage.jsx";
 
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════
@@ -107,6 +108,7 @@ export default function App(){
   const [batches,setBatches,setBatchesL]=usePersisted("dk_batches",INIT_BATCHES);
   const [defects,setDefects]=usePersisted("dk_defects",INIT_DEFECTS);
   const [payrollRecords,setPayrollRecords]=usePersisted("dk_payroll",[]);
+  const [messages,setMessages]=usePersisted("dk_messages",[]);
   const [cameras,setCameras]=usePersisted("dk_cameras",INIT_CAMERAS);
   const [suppliers,setSuppliers]=usePersisted("dk_suppliers",INIT_SUPPLIERS);
   const [deliveries,setDeliveries]=usePersisted("dk_deliveries",INIT_DELIVERIES);
@@ -308,9 +310,10 @@ export default function App(){
     debts,setDebts,
     batches,setBatches,defects,setDefects,
     payrollRecords,setPayrollRecords,
+    messages,setMessages,
     cameras,setCameras,
     applyOutput,revertOutput,applyServerState,
-  }),[users,products,tasks,rawMaterials,recipes,taskEmployees,employeeHistory,productionPlans,clients,clientOrders,sales,inventoryMovements,suppliers,deliveries,rawMovements,notifications,marks,logs,addLog,addNotification,currentUser,production,page,hiddenWarningsMap,hideWarningItem,restoreWarningItem,productionOutputs,bonusRules,baseSalaries,debts,batches,defects,payrollRecords,cameras,applyOutput,revertOutput,applyServerState,setClientOrdersL]);
+  }),[users,products,tasks,rawMaterials,recipes,taskEmployees,employeeHistory,productionPlans,clients,clientOrders,sales,inventoryMovements,suppliers,deliveries,rawMovements,notifications,marks,logs,addLog,addNotification,currentUser,production,page,hiddenWarningsMap,hideWarningItem,restoreWarningItem,productionOutputs,bonusRules,baseSalaries,debts,batches,defects,payrollRecords,messages,cameras,applyOutput,revertOutput,applyServerState,setClientOrdersL]);
 
   const pageVariants = useMotionVariants(pageTransition);
   const reduceMotion = useReducedMotion();
@@ -1204,6 +1207,7 @@ export default function App(){
       {id:"logs",label:"Журнал",ok:isSuperAdmin},
     ]},
     { id:"system", label:"Система", icon:I.gear, items:[
+      {id:"inbox",label:"Ящик",ok:true},
       {id:"notifications",label:"Уведомления",ok:true},
       {id:"cameras",label:"Камеры",ok:isManagerLike},
       {id:"aiChat",label:"Помощник AI",ok:true},
@@ -1230,6 +1234,7 @@ export default function App(){
   };
 
   const unreadCount=notifications.filter(n=>(n.targetAll||n.targetUsers?.includes(currentUser.id))&&!n.readBy?.includes(currentUser.id)).length;
+  const unreadMsgCount=(messages||[]).filter(m=>m.toId===currentUser.id&&!m.readBy?.includes(currentUser.id)).length;
 
   const renderPage=()=>{
     switch(page){
@@ -1252,6 +1257,7 @@ export default function App(){
       case "empstats":return isManagerLikeRole?<EmployeeStatsPage/>:<DashboardPage/>;
       case "salary":return isManagerLikeRole?<PayrollPage/>:<DashboardPage/>;
       case "workerHistory":return <WorkerHistoryPage/>;
+      case "inbox":return <MessagesPage/>;
       case "notifications":return <NotificationsPage/>;
       case "debts":return isManagerLikeRole?<DebtsPage/>:<DashboardPage/>;
       case "marks":return <MarksPage/>;
@@ -1329,7 +1335,7 @@ export default function App(){
                 const isOpen=isGroupOpen(group.id);
                 const groupHasActive=group.items.some(i=>i.id===page);
                 const isSingle=group.items.length===1;
-                const showBadgeOnGroup=group.id==="system"&&unreadCount>0;
+                const showBadgeOnGroup=group.id==="system"&&(unreadCount>0||unreadMsgCount>0);
 
                 if(isSingle){
                   const item=group.items[0];
@@ -1367,12 +1373,13 @@ export default function App(){
                     >
                       {group.items.map(item=>{
                         const active=page===item.id;
-                        const showItemBadge=item.id==="notifications"&&unreadCount>0;
+                        const showItemBadge=(item.id==="notifications"&&unreadCount>0)||(item.id==="inbox"&&unreadMsgCount>0);
+                        const itemBadgeCount=item.id==="inbox"?unreadMsgCount:unreadCount;
                         return(
                           <motion.button key={item.id} layout={!reduceMotion} transition={navLayoutTransition} onClick={()=>{setPage(item.id);setSideOpen(false)}} className={`nav-sub-item${active?" active":""}`}>
                             {active&&<motion.div layoutId="active-nav-pill" className="active-nav-pill" transition={spring.soft}/>}
                             <span className="nav-sub-content">{item.label}</span>
-                            {showItemBadge&&<span style={{marginLeft:"auto",minWidth:16,height:16,borderRadius:8,background:C.danger,color:"#fff",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{unreadCount>9?"9+":unreadCount}</span>}
+                            {showItemBadge&&<span style={{marginLeft:"auto",minWidth:16,height:16,borderRadius:8,background:C.danger,color:"#fff",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{itemBadgeCount>9?"9+":itemBadgeCount}</span>}
                           </motion.button>
                         );
                       })}

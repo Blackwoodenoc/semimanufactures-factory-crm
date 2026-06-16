@@ -111,6 +111,7 @@ const KEY_ACCESS = {
   dk_bonus_rules:     { read: "manager",write: "admin"   },
   dk_cameras:         { read: "manager",write: "manager" },
   dk_nav_layout:      { read: "all",    write: "admin"   },
+  dk_messages:        { read: "all",    write: "all"     },
 };
 
 // Role hierarchy: which level satisfies which requirement
@@ -2055,6 +2056,7 @@ async function bootstrapState() {
   ];
   for (const key of emptyArrayKeys) await seedIfMissing(key, []);
   await seedIfMissing("dk_base_salaries", {});
+  await seedIfMissing("dk_messages", []);
 
   console.log("[bootstrap] Done");
 }
