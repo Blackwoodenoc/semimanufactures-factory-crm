@@ -16,6 +16,7 @@ import { pageTransition, spring, stagger, listItem } from "./motion/presets.js";
 // Pages and components
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { NotificationBell } from "./components/layout/NotificationBell.jsx";
+import { NavSearch } from "./components/layout/NavSearch.jsx";
 import { DashboardPage } from "./pages/DashboardPage.jsx";
 import { UsersPage } from "./pages/UsersPage.jsx";
 import { ProductsPage } from "./pages/ProductsPage.jsx";
@@ -41,16 +42,7 @@ import { CameraPage } from "./pages/CameraPage.jsx";
 import { OrdersBoardStandalone, OrdersBoardPage } from "./pages/OrdersBoardPage.jsx";
 import { BatchesPage } from "./pages/BatchesPage.jsx";
 import { DefectsPage } from "./pages/DefectsPage.jsx";
-import { PackingPage } from "./pages/PackingPage.jsx";
-import { DeliveryPage } from "./pages/DeliveryPage.jsx";
-import { TrashPage } from "./pages/TrashPage.jsx";
-import { getJobProfile, isManagerLike, isSuperAdmin, roleChipLabel, pageTitle } from "./utils/roles.js";
-import { formatMoney } from "./utils/formatters.js";
-import { APP_BRAND, APP_TAGLINE } from "./constants/brand.js";
-import { loadHiddenWarnings, hideWarning, restoreWarning } from "./utils/hiddenWarnings.js";
-import { buildBaseNavGroups } from "./navigation/modules.js";
-import { applyNavLayout } from "./utils/navigation.js";
-import { NavSettingsModal } from "./components/layout/NavSettingsModal.jsx";
+import { AIChatPage } from "./pages/AIChatPage.jsx";
 
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════
@@ -336,16 +328,7 @@ export default function App(){
     @keyframes softFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
     @keyframes pulseBorder{0%,100%{box-shadow:0 0 0 1px rgba(255,107,95,.22),0 4px 16px rgba(255,107,95,.06)}50%{box-shadow:0 0 0 2px rgba(255,107,95,.38),0 8px 24px rgba(255,107,95,.12)}}
     @keyframes pulseGlow{0%,100%{opacity:1}50%{opacity:0.35}}
-    @keyframes skeletonShimmer{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
-    @keyframes ambientGradient{
-      0%{transform:translate3d(-1%,-1%,0) scale(1)}
-      50%{transform:translate3d(1%,1.5%,0) scale(1.035)}
-      100%{transform:translate3d(1.5%,-1%,0) scale(1.02)}
-    }
-    @keyframes btnShine{
-      0%{transform:translateX(-120%) skewX(-12deg)}
-      100%{transform:translateX(220%) skewX(-12deg)}
-    }
+    @keyframes spin{to{transform:rotate(360deg)}}
     option{background:#1a1612;color:${C.text}}
     .motion-safe{
       transition:transform var(--motion-base) var(--ease-out-soft),opacity var(--motion-base) var(--ease-out-soft),
@@ -1169,17 +1152,52 @@ export default function App(){
   const isManager=role?.name==="manager";
   const isWorker=role?.name==="worker";
   const isOwner=role?.name==="owner";
-  const isSuperAdmin=isAdmin||isOwner;
-  const isManagerLikeRole=isSuperAdmin||isManager;
-  const isPacker=jobProfile==="packer";
-  const isCourier=jobProfile==="courier";
-  const isLepstitsa=jobProfile==="lepstitsa";
+  const isSuperAdmin=isAdmin||isOwner; // admin (roleId 1) and owner (roleId 4) see everything
+  const isManagerLike=isSuperAdmin||isManager; // admin + owner + manager
 
-  const navCtx={
-    isPacker,isCourier,isLepstitsa,isWorker,isManagerLikeRole,isSuperAdmin,
-  };
-
-  const navGroups=applyNavLayout(buildBaseNavGroups(navCtx),navLayout);
+  // ── Grouped Navigation ──
+  const navGroups = [
+    { id:"main", label:"Главная", icon:I.home, items:[
+      {id:"dashboard",label:"Главная",ok:true},
+    ]},
+    { id:"production", label:"Производство", icon:I.factory, items:[
+      {id:"tasks",label:"Задания",ok:true},
+      {id:"products",label:"Товары",ok:true},
+      {id:"prodOutput",label:"Выпуск",ok:true},
+      {id:"planning",label:"Планирование",ok:isManagerLike},
+      {id:"batches",label:"Партии",ok:isManagerLike},
+      {id:"defects",label:"Брак",ok:isManagerLike},
+    ]},
+    { id:"warehouse", label:"Склад", icon:I.warehouse, items:[
+      {id:"raw",label:"Сырьё",ok:isManagerLike},
+      {id:"deliveries",label:"Поставки",ok:isManagerLike},
+      {id:"procurement",label:"Закупки",ok:isManagerLike},
+    ]},
+    { id:"sales", label:"Торговля", icon:I.truck, items:[
+      {id:"clients",label:"Магазины",ok:isManagerLike},
+      {id:"sales",label:"Продажи",ok:isManagerLike},
+      {id:"inventory",label:"Движение",ok:isManagerLike},
+      {id:"ordersBoard",label:"Доска заказов",ok:isManagerLike},
+      {id:"debts",label:"Долги магазинов",ok:isManagerLike},
+    ]},
+    { id:"staff", label:"Персонал", icon:I.people, items:[
+      {id:"empstats",label:"KPI",ok:isManagerLike},
+      {id:"salary",label:"Расчёт оплаты",ok:isManagerLike},
+      {id:"workerHistory",label:"История",ok:true},
+      {id:"marks",label:"Посещаемость",ok:true},
+      {id:"users",label:"Пользователи",ok:isSuperAdmin},
+    ]},
+    { id:"analytics", label:"Аналитика", icon:I.analytics, items:[
+      {id:"reports",label:"Отчёты",ok:isManagerLike},
+      {id:"profitAnalytics",label:"Прибыль",ok:isManagerLike},
+      {id:"logs",label:"Журнал",ok:isSuperAdmin},
+    ]},
+    { id:"system", label:"Система", icon:I.gear, items:[
+      {id:"notifications",label:"Уведомления",ok:true},
+      {id:"cameras",label:"Камеры",ok:isManagerLike},
+      {id:"aiChat",label:"Помощник AI",ok:true},
+    ]},
+  ].map(g=>({...g,items:g.items.filter(i=>i.ok)})).filter(g=>g.items.length>0);
 
   // Find which group the current page belongs to
   let activeGroupId = "main";
@@ -1230,8 +1248,8 @@ export default function App(){
       case "profitAnalytics":return isManagerLikeRole?<ProfitAnalyticsPage/>:<DashboardPage/>;
       case "users":return isSuperAdmin?<UsersPage/>:<DashboardPage/>;
       case "logs":return isSuperAdmin?<LogsPage/>:<DashboardPage/>;
-      case "cameras":return isManagerLikeRole?<CameraPage/>:<DashboardPage/>;
-      case "trash":return isSuperAdmin?<TrashPage/>:<DashboardPage/>;
+      case "cameras":return isManagerLike?<CameraPage/>:<DashboardPage/>;
+      case "aiChat":return <AIChatPage/>;
       default:return <DashboardPage/>;
     }
   };
@@ -1382,34 +1400,23 @@ export default function App(){
           <div className="app-workspace">
             <header className="glass-topbar">
               <button onClick={()=>setSideOpen(!sideOpen)} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.10)",borderRadius:10,color:C.muted,cursor:"pointer",padding:7,display:isMobile?"flex":"none",alignItems:"center"}}><I.menu size={18}/></button>
-              {isMobile&&(
-                <span style={{fontSize:13,fontWeight:700,color:C.text,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {pageTitle(page, currentUser)}
-                </span>
-              )}
-              {!isMobile && (
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
-                    {pageTitle(page, currentUser)}
-                  </div>
-                  <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
-                    {roleChipLabel(currentUser)}
-                  </div>
-                </div>
-              )}
-              {!isMobile && isManagerLikeRole && (() => {
-                const activeDebtSum = debts.filter(d => d.status !== "погашен").reduce((s, d) => s + (d.remaining ?? d.amount ?? 0), 0);
-                const stockValue = products.filter(p => !p.deleted).reduce((s, p) => s + p.stock * p.sellPrice, 0);
-                const chip = activeDebtSum > 0
-                  ? { label: "Долги", value: formatMoney(activeDebtSum), color: C.danger, page: "debts" }
-                  : stockValue > 0
-                    ? { label: "Склад", value: formatMoney(stockValue), color: C.primary, page: "products" }
-                    : null;
-                if (!chip) return null;
-                return (
-                  <div className="glass-chip hide-mobile" onClick={() => setPage(chip.page)} title={chip.label} style={{ cursor: "pointer" }}>
-                    <span style={{ fontSize: 10, color: C.dim, textTransform: "uppercase", letterSpacing: "0.04em" }}>{chip.label}</span>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: chip.color, lineHeight: 1.2 }}>{chip.value}</div>
+              <NavSearch navGroups={navGroups} onGoToPage={setPage}/>
+              {isManagerLike&&(()=>{
+                const totalIncome=sales.reduce((s,sl)=>{const p=products.find(x=>x.id===sl.productId);return s+(p?.sellPrice||0)*sl.quantity},0)+clientOrders.filter(o=>o.status==="отгружен").reduce((s,o)=>s+o.total,0);
+                const totalExpense=deliveries.reduce((s,d)=>s+d.totalPrice,0);
+                const balance=totalIncome-totalExpense;
+                const monthStr=new Date().toISOString().slice(0,7);
+                const monthIncome=sales.filter(sl=>sl.createdAt?.startsWith(monthStr)).reduce((s,sl)=>{const p=products.find(x=>x.id===sl.productId);return s+(p?.sellPrice||0)*sl.quantity},0)+clientOrders.filter(o=>o.status==="отгружен"&&o.shippedAt?.startsWith(monthStr)).reduce((s,o)=>s+o.total,0);
+                const monthExpense=deliveries.filter(d=>d.date?.startsWith(monthStr)).reduce((s,d)=>s+d.totalPrice,0);
+                const monthProfit=monthIncome-monthExpense;
+                const balClr=balance>=0?C.success:C.danger;
+                return(
+                  <div className="glass-chip" onClick={()=>setPage("profitAnalytics")} title="Подробная аналитика">
+                    <span style={{fontSize:11,color:monthProfit>0?C.success:monthProfit===0?C.orange:C.danger}}>●</span>
+                    <div style={{lineHeight:1.2}}>
+                      <div style={{fontSize:12,fontWeight:700,color:balClr}}>{balance>=0?"+":""}{(balance/1000).toFixed(0)}т ₽</div>
+                      <div style={{fontSize:9,color:C.dim}}>мес: {monthProfit>=0?"+":""}{(monthProfit/1000).toFixed(0)}т</div>
+                    </div>
                   </div>
                 );
               })()}

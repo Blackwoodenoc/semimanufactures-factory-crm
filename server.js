@@ -5,6 +5,9 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { pbkdf2Sync, randomBytes, randomUUID } from "crypto";
 import fs from "fs";
+import { spawn } from "child_process";
+import { rm, mkdir } from "fs/promises";
+import { tmpdir } from "os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -2011,12 +2014,36 @@ async function bootstrapState() {
     { id:5, fromQty:800, bonusPercent:20, label:"Рекорд"        },
   ]);
 
-  await seedIfMissing("dk_cameras", [
-    { id:1, name:"Цех — линия 1",           zone:"Цех",   type:"demo", url:"", enabled:true, description:"Производственная линия №1",    refreshSec:5, createdAt:"2024-01-01T00:00:00" },
-    { id:2, name:"Склад готовой продукции",  zone:"Склад", type:"demo", url:"", enabled:true, description:"Зона хранения",               refreshSec:5, createdAt:"2024-01-01T00:00:00" },
-    { id:3, name:"Вход в здание",            zone:"Вход",  type:"demo", url:"", enabled:true, description:"Главный вход",                refreshSec:5, createdAt:"2024-01-01T00:00:00" },
-    { id:4, name:"Офис менеджера",           zone:"Офис",  type:"demo", url:"", enabled:true, description:"Рабочее место менеджера",     refreshSec:5, createdAt:"2024-01-01T00:00:00" },
-  ]);
+  const ALL_CAMERAS = [
+    { id:5, name:"Говорит Москва",   zone:"Улица",  type:"iframe", url:"https://video.govoritmoskva.ru/rufm/embed.html?autoplay=true",                                         enabled:true, description:"Веб-камера студии Говорит Москва",    refreshSec:5, createdAt:"2024-01-01T00:00:00" },
+    { id:6, name:"Грозный Сити",     zone:"Улица",  type:"hls",    url:"https://camera.vt.ru:8888/cam1/index.m3u8",                                                             enabled:true, description:"HLS-камера Вайнах Телеком — Грозный", refreshSec:5, createdAt:"2024-01-01T00:00:00" },
+    { id:7, name:"Мансур (медведь)", zone:"Улица",  type:"iframe", url:"https://vkvideo.ru/video_ext.php?oid=-135955999&id=456239536&hd=1&autoplay=1",                          enabled:true, description:"Трансляция медведя Мансур — ВКонтакте", refreshSec:5, createdAt:"2024-01-01T00:00:00" },
+    { id:8, name:"Плаза СПА",        zone:"Улица",  type:"iframe", url:"https://open.ivideon.com/embed/v3/?server=100-PMOSoaWrNLw3bnCEKwk7RX&camera=0&width=&height=&lang=ru", enabled:true, description:"Камера Плаза СПА — ivideon",           refreshSec:5, createdAt:"2024-01-01T00:00:00" },
+  ];
+  await seedIfMissing("dk_cameras", ALL_CAMERAS);
+  // Migration: replace camera list with exactly ALL_CAMERAS (removes old demo/deleted entries)
+  const existingCameras = await readState("dk_cameras");
+  if (existingCameras) {
+    const seedMap = new Map(ALL_CAMERAS.map(c => [c.id, c]));
+    const allowedIds = new Set(ALL_CAMERAS.map(c => c.id));
+    // Keep only cameras that are in the seed; update url/type/description if changed
+    const kept = existingCameras
+      .filter(c => allowedIds.has(c.id))
+      .map(c => {
+        const seed = seedMap.get(c.id);
+        if (c.url !== seed.url || c.type !== seed.type) {
+          return { ...c, url: seed.url, type: seed.type, description: seed.description };
+        }
+        return c;
+      });
+    const keptIds = new Set(kept.map(c => c.id));
+    const missing = ALL_CAMERAS.filter(c => !keptIds.has(c.id));
+    const final = [...kept, ...missing];
+    if (JSON.stringify(final) !== JSON.stringify(existingCameras)) {
+      await writeState("dk_cameras", final);
+      console.log(`[bootstrap] Cameras synced: ${final.length} active`);
+    }
+  }
 
   // All remaining keys: empty arrays (or objects) if missing
   const emptyArrayKeys = [
@@ -2033,6 +2060,144 @@ async function bootstrapState() {
 }
 
 const HOST = process.env.HOST || "127.0.0.1";
+
+// ── RTSP → HLS via FFmpeg ──
+const ffmpegProcs = new Map(); // cameraId → ChildProcess
+
+// Resolve ffmpeg binary — check PATH first, then known WinGet install location
+function findFfmpeg() {
+  const candidates = [
+    "ffmpeg",
+    // WinGet default install for Gyan.FFmpeg
+    join(process.env.LOCALAPPDATA || "", "Microsoft", "WinGet", "Packages",
+      "Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe",
+      "ffmpeg-8.1.1-full_build", "bin", "ffmpeg.exe"),
+    // Common manual install
+    "C:\\ffmpeg\\bin\\ffmpeg.exe",
+    "/usr/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+  ];
+  for (const c of candidates) {
+    if (c === "ffmpeg") { try { require; } catch {} return c; } // always try bare name first
+    if (fs.existsSync(c)) return c;
+  }
+  return "ffmpeg"; // fallback, will fail with clear error
+}
+const FFMPEG_BIN = findFfmpeg();
+console.log(`[cameras] ffmpeg → ${FFMPEG_BIN}`);
+
+function hlsDir(id) {
+  return join(tmpdir(), "dikanish-hls", String(id));
+}
+
+function requireManager(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: "Не авторизован" });
+  if (!satisfies(req.user.roleId, "manager")) return res.status(403).json({ error: "Недостаточно прав" });
+  next();
+}
+
+app.post("/api/cameras/:id/start", requireManager, async (req, res) => {
+  const { id } = req.params;
+  const { rtspUrl } = req.body;
+  if (!rtspUrl) return res.status(400).json({ error: "Укажите rtspUrl" });
+
+  if (ffmpegProcs.has(id)) return res.json({ ok: true, already: true });
+
+  const dir = hlsDir(id);
+  try {
+    await mkdir(dir, { recursive: true });
+  } catch {}
+
+  const isRtsp = rtspUrl.startsWith("rtsp://") || rtspUrl.startsWith("rtsps://");
+  const inputArgs = isRtsp
+    ? ["-rtsp_transport", "tcp", "-i", rtspUrl]
+    : ["-i", rtspUrl]; // works for http/https HLS, MJPEG, MP4
+
+  const proc = spawn(FFMPEG_BIN, [
+    ...inputArgs,
+    "-c:v", "copy",
+    "-an",
+    "-f", "hls",
+    "-hls_time", "2",
+    "-hls_list_size", "3",
+    "-hls_flags", "delete_segments",
+    join(dir, "index.m3u8"),
+  ], { stdio: "ignore" });
+
+  let startError = null;
+  proc.on("error", (e) => {
+    startError = e.message;
+    console.error(`[ffmpeg cam ${id}]`, e.message);
+    ffmpegProcs.delete(id);
+  });
+  proc.on("exit", (code) => {
+    ffmpegProcs.delete(id);
+    if (code !== 0) console.log(`[ffmpeg cam ${id}] exited with code ${code}`);
+  });
+
+  // Give FFmpeg 400ms to fail fast (e.g. binary not found)
+  await new Promise(r => setTimeout(r, 400));
+  if (startError) return res.status(500).json({ error: `FFmpeg: ${startError}` });
+
+  ffmpegProcs.set(id, proc);
+  res.json({ ok: true });
+});
+
+app.post("/api/cameras/:id/stop", requireManager, async (req, res) => {
+  const { id } = req.params;
+  const proc = ffmpegProcs.get(id);
+  if (proc) {
+    proc.kill("SIGKILL");
+    ffmpegProcs.delete(id);
+  }
+  try { await rm(hlsDir(id), { recursive: true, force: true }); } catch {}
+  res.json({ ok: true });
+});
+
+app.get("/api/cameras/:id/hls/:file", requireManager, (req, res) => {
+  const filePath = join(hlsDir(req.params.id), req.params.file);
+  if (!fs.existsSync(filePath)) return res.status(404).end();
+  const ext = req.params.file.split(".").pop();
+  res.setHeader("Content-Type", ext === "m3u8" ? "application/vnd.apple.mpegurl" : "video/MP2T");
+  res.setHeader("Cache-Control", "no-cache");
+  res.sendFile(filePath);
+});
+
+// ── HLS proxy (bypasses CORS on external streams) ──
+app.get("/api/cameras/hls-proxy", requireManager, async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).end();
+  try {
+    const upstream = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!upstream.ok) return res.status(upstream.status).end();
+
+    const ct = upstream.headers.get("content-type") || "";
+    const isPlaylist = url.includes(".m3u8") || ct.includes("mpegurl");
+
+    if (isPlaylist) {
+      const base = url.substring(0, url.lastIndexOf("/") + 1);
+      const text = await upstream.text();
+      // Rewrite every non-comment line (segment URLs and sub-playlist URLs)
+      const rewritten = text.split("\n").map(line => {
+        const t = line.trim();
+        if (!t || t.startsWith("#")) return line;
+        const abs = t.startsWith("http") ? t : base + t;
+        return `/api/cameras/hls-proxy?url=${encodeURIComponent(abs)}`;
+      }).join("\n");
+      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+      res.setHeader("Cache-Control", "no-cache");
+      return res.send(rewritten);
+    }
+
+    // Binary segment — stream directly
+    res.setHeader("Content-Type", ct || "video/MP2T");
+    res.setHeader("Cache-Control", "no-cache");
+    const buf = await upstream.arrayBuffer();
+    res.send(Buffer.from(buf));
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
 
 // ── Health / ping (must be before SPA fallback) ──
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "dikanish-api", time: Date.now() }));
