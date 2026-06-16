@@ -10,16 +10,17 @@ import { apiFetch } from "../api/client.js";
 
 // USERS
 const UsersPage = ()=>{
-  const {users,addLog,currentUser,baseSalaries,setBaseSalaries,applyServerState}=useContext(AppContext);
+  const {users,setUsers,addLog,currentUser,baseSalaries,setBaseSalaries,applyServerState}=useContext(AppContext);
   const [modal,setModal]=useState(false);
   const [edit,setEdit]=useState(null);
   const [search,setSearch]=useState("");
   const [toast,setToast]=useState(null);
+  const [confirm,setConfirm]=useState(null);
   const emptyForm={name:"",email:"",password:"",roleId:2,status:"active",baseSalary:"",jobTitle:"",payType:"сдельная",dailyNorm:"",pieceRate:"",fixedDayRate:"",comment:""};
   const [form,setForm]=useState(emptyForm);
   const [errs,setErrs]=useState({});
 
-  const filtered=users.filter(u=>u.name.toLowerCase().includes(search.toLowerCase())||u.email.toLowerCase().includes(search.toLowerCase()));
+  const filtered=users.filter(u=>!u.deleted&&(u.name.toLowerCase().includes(search.toLowerCase())||u.email.toLowerCase().includes(search.toLowerCase())));
   const openNew=()=>{setEdit(null);setForm(emptyForm);setErrs({});setModal(true)};
   const openEdit=u=>{setEdit(u);setForm({name:u.name,email:u.email,password:"",roleId:u.roleId,status:u.status,baseSalary:baseSalaries[u.id]||"",jobTitle:u.jobTitle||"",payType:u.payType||"сдельная",dailyNorm:u.dailyNorm||"",pieceRate:u.pieceRate||"",fixedDayRate:u.fixedDayRate||"",comment:u.comment||""});setErrs({});setModal(true)};
   const validate=()=>{const e={};if(!form.name.trim())e.name="!";if(!form.email.trim())e.email="!";else if(!/\S+@\S+\.\S+/.test(form.email))e.email="Email";if(!edit&&!form.password)e.password="!";setErrs(e);return!Object.keys(e).length};
@@ -72,6 +73,11 @@ const UsersPage = ()=>{
       setToast({message:blocked?"Заблокирован":"Разблокирован",type:blocked?"error":"success"});
     }catch{setToast({message:"Ошибка сети",type:"error"});}
   };
+  const del=u=>{setConfirm({title:"Удалить?",message:`Удалить "${u.name}"? Запись попадёт в корзину — её можно восстановить.`,onConfirm:()=>{
+    const now=new Date().toISOString();
+    setUsers(prev=>prev.map(x=>x.id===u.id?{...x,deleted:true,deletedAt:now,deletedBy:currentUser.id,deletedByName:currentUser.name,deletedReason:""}:x));
+    addLog(`Удалён: ${u.name}`);setToast({message:"Удалён",type:"error"});setConfirm(null);
+  }})};
 
   return(
     <div>
@@ -93,7 +99,7 @@ const UsersPage = ()=>{
                 {(u.payType==="фиксированная"||u.payType==="смешанная")&&baseSalaries[u.id]>0&&<div style={{color:C.dim,fontSize:10}}>{baseSalaries[u.id].toLocaleString("ru")}₽/мес</div>}
               </TD>
               <TD><Badge color={u.status==="active"?"success":"danger"}>{u.status==="active"?"Активен":"Заблок."}</Badge></TD>
-              <TD><div style={{display:"flex",gap:4}}><Btn v="ghost" sz="sm" onClick={()=>openEdit(u)} icon={<I.edit size={14}/>}/>{u.id!==currentUser.id&&<Btn v="ghost" sz="sm" onClick={()=>toggleBlock(u)} icon={u.status==="active"?<I.lock size={14}/>:<I.unlock size={14}/>}/>}</div></TD>
+              <TD><div style={{display:"flex",gap:4}}><Btn v="ghost" sz="sm" onClick={()=>openEdit(u)} icon={<I.edit size={14}/>}/>{u.id!==currentUser.id&&<Btn v="ghost" sz="sm" onClick={()=>toggleBlock(u)} icon={u.status==="active"?<I.lock size={14}/>:<I.unlock size={14}/>}/>}{u.id!==currentUser.id&&<Btn v="ghost" sz="sm" onClick={()=>del(u)} icon={<I.trash size={14}/>}/>}</div></TD>
             </tr>)})}</tbody>
         </table></div></Card>
       <Modal open={modal} onClose={()=>setModal(false)} title={edit?"Редактировать":"Новый сотрудник"} width={480}>
@@ -119,6 +125,7 @@ const UsersPage = ()=>{
         <Txa label="Комментарий" value={form.comment} onChange={e=>setForm({...form,comment:e.target.value})} placeholder="Заметки..."/>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="secondary" onClick={()=>setModal(false)}>Отмена</Btn><Btn onClick={save}>{edit?"Сохранить":"Создать"}</Btn></div>
       </Modal>
+      {confirm&&<Confirm open onClose={()=>setConfirm(null)} {...confirm}/>}
       {toast&&<Toast {...toast} onClose={()=>setToast(null)}/>}
     </div>
   );

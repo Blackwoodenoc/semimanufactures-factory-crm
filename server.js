@@ -248,6 +248,7 @@ app.post("/api/auth/login", async (req, res) => {
     const user = users.find(u => String(u.email || "").trim().toLowerCase() === normalizedEmail);
     if (!user) return res.status(401).json({ error: "Неверный email или пароль" });
     if (user.status === "blocked") return res.status(403).json({ error: "Аккаунт заблокирован" });
+    if (user.deleted) return res.status(403).json({ error: "Аккаунт удалён" });
     if (!verifyPassword(password, user.password)) {
       if (typeof user.password !== "string" || !user.password) {
         console.error(`[login] user ${user.id} (${user.email}) has no password hash set`);
@@ -309,7 +310,7 @@ app.get("/api/auth/me", async (req, res) => {
     if (req.user) {
       const user = users.find(u => u.id === req.user.userId);
       if (!user) return res.status(401).json({ error: "Пользователь не найден" });
-      if (user.status === "blocked") return res.status(403).json({ error: "Аккаунт заблокирован" });
+      if (user.status === "blocked" || user.deleted) return res.status(403).json({ error: user.deleted ? "Аккаунт удалён" : "Аккаунт заблокирован" });
       // If role was changed by admin, issue a fresh access token
       if (user.roleId !== req.user.roleId) {
         const newAccess = jwt.sign({ userId: user.id, roleId: user.roleId }, ACCESS_SECRET, { expiresIn: "15m" });
@@ -327,7 +328,7 @@ app.get("/api/auth/me", async (req, res) => {
       if (!stored) return res.status(401).json({ error: "Сессия истекла" });
       const user = users.find(u => u.id === payload.userId);
       if (!user) return res.status(401).json({ error: "Пользователь не найден" });
-      if (user.status === "blocked") return res.status(403).json({ error: "Аккаунт заблокирован" });
+      if (user.status === "blocked" || user.deleted) return res.status(403).json({ error: user.deleted ? "Аккаунт удалён" : "Аккаунт заблокирован" });
       // Issue new access token
       const newAccess = jwt.sign({ userId: user.id, roleId: user.roleId }, ACCESS_SECRET, { expiresIn: "15m" });
       res.cookie("access_token", newAccess, ACCESS_COOKIE_OPTS);
@@ -351,7 +352,7 @@ app.post("/api/auth/refresh", async (req, res) => {
     if (!stored) return res.status(401).json({ error: "Refresh токен отозван" });
     const users = await readState("dk_users") || [];
     const user = users.find(u => u.id === payload.userId);
-    if (!user || user.status === "blocked") {
+    if (!user || user.status === "blocked" || user.deleted) {
       await pool.query("DELETE FROM refresh_tokens WHERE id = $1", [payload.jti]);
       return res.status(401).json({ error: "Пользователь недоступен" });
     }
